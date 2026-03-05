@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chi Tiêu Của Đậu</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Be Vietnam Pro',sans-serif}
+body{
+background:linear-gradient(135deg,#fdf6e3,#f5e1b8);
+display:flex;justify-content:center;align-items:center;height:100vh;
+}
+.app{
+width:590px;height:930px;background:#fffdf8;border-radius:30px;
+overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.15);
+display:flex;flex-direction:column;
+}
+.header{background:#b8860b;color:#fff;padding:25px;text-align:center;}
+.balance{font-size:26px;font-weight:700;margin-top:10px}
+.deposit{font-size:14px;margin-top:5px}
+.content{flex:1;padding:20px;overflow-y:auto}
+.section-title{font-size:14px;font-weight:600;margin:12px 0 6px;color:#a67c00;}
+input,select{
+width:100%;padding:12px;border-radius:12px;
+border:1px solid #e8d3a3;margin-bottom:10px;outline:none;background:#fffdf8;
+}
+button{
+width:100%;padding:13px;border:none;border-radius:14px;
+background:#a67c00;color:white;font-weight:600;cursor:pointer;margin-bottom:10px;
+}
+button:hover{background:#8c6900;}
+.transaction-day{font-size:13px;font-weight:600;margin:14px 0 6px;color:#a67c00;}
+.transaction{
+background:#fff6dd;padding:12px;border-radius:14px;
+display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;
+}
+.amount.plus{color:green;font-weight:600}
+.amount.minus{color:red;font-weight:600}
+.action-btn{
+margin-left:5px;background:#ff4d4d;color:white;
+border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:12px;
+}
+.edit-btn{background:#2196f3;}
+.stats{display:flex;justify-content:space-between;margin-top:10px;font-size:13px;color:#a67c00;}
+canvas{margin-top:10px;background:#fff6dd;border-radius:14px;padding:10px;}
+.logout-btn{background:#444;margin-top:15px}
+.login-box{
+width:390px;height:500px;background:white;border-radius:30px;
+box-shadow:0 20px 60px rgba(0,0,0,0.15);
+padding:30px;display:flex;flex-direction:column;justify-content:center;
+}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-box">
+<h2 style="text-align:center;margin-bottom:20px;color:#a67c00;">Đăng Nhập</h2>
+<input type="text" id="username" placeholder="Tên tài khoản">
+<input type="password" id="password" placeholder="Mật khẩu">
+<button onclick="login()">Đăng nhập</button>
+<button onclick="register()">Tạo tài khoản mới</button>
+</div>
+
+<div class="app" id="app" style="display:none;">
+<div class="header">
+<h1>Chi Tiêu Của Đậu</h1>
+<div class="balance" id="balance">0 VND</div>
+<div class="deposit" id="depositInfo">Tiền nạp tháng này: 0 VND</div>
+</div>
+
+<div class="content">
+
+<div class="section-title">Lọc theo tháng</div>
+<input type="month" id="filterMonth">
+
+<div class="section-title">Nạp tiền</div>
+<input type="text" id="depositAmount" placeholder="Số tiền nạp">
+<button onclick="addDeposit()">Nạp tiền</button>
+
+<div id="depositList" style="margin-bottom:10px;"></div>
+
+<div class="section-title">Thêm giao dịch</div>
+<select id="type">
+<option value="income">Thu nhập</option>
+<option value="expense">Chi tiêu</option>
+</select>
+
+<input type="text" id="note" placeholder="Nội dung">
+<input type="text" id="amount" placeholder="Số tiền">
+<input type="date" id="date">
+<button onclick="addTransaction()">Thêm giao dịch</button>
+
+<div class="stats">
+<div id="totalIncome">Tổng thu: 0 VND</div>
+<div id="totalExpense">Tổng chi: 0 VND</div>
+</div>
+
+<canvas id="chart" height="120"></canvas>
+<div id="aiBox" style="margin-top:8px;font-size:13px;color:#a67c00;"></div>
+<div id="transactionList"></div>
+
+<button class="logout-btn" onclick="logout()">Đăng xuất</button>
+
+</div>
+</div>
+
+<script>
+let currentUser=null;
+let transactions=[];
+let deposits=[];
+
+function formatMoney(num){
+return Number(num).toLocaleString('vi-VN')+" VND";
+}
+
+function formatDate(dateString){
+let d = new Date(dateString);
+let day = String(d.getDate()).padStart(2,'0');
+let month = String(d.getMonth()+1).padStart(2,'0');
+let year = d.getFullYear();
+return `${day}/${month}/${year}`;
+}
+
+function formatInputMoney(input){
+let value=input.value.replace(/\D/g,"");
+input.value=Number(value||0).toLocaleString('vi-VN');
+}
+
+function deleteDeposit(index){
+deposits.splice(index,1);
+save();
+render();
+}
+
+document.getElementById("amount").addEventListener("input",function(){formatInputMoney(this)});
+document.getElementById("depositAmount").addEventListener("input",function(){formatInputMoney(this)});
+
+function register(){
+let u=username.value;
+let p=password.value;
+if(!u||!p)return alert("Nhập đầy đủ!");
+if(localStorage.getItem("user_"+u)) return alert("Tài khoản đã tồn tại!");
+localStorage.setItem("user_"+u,JSON.stringify({password:p}));
+alert("Tạo tài khoản thành công!");
+}
+
+function login(){
+let u=username.value;
+let p=password.value;
+let data=JSON.parse(localStorage.getItem("user_"+u));
+if(!data||data.password!==p) return alert("Sai tài khoản hoặc mật khẩu!");
+currentUser=u;
+transactions=JSON.parse(localStorage.getItem("trans_"+u))||[];
+deposits=JSON.parse(localStorage.getItem("depo_"+u))||[];
+loginScreen.style.display="none";
+app.style.display="flex";
+render();
+}
+
+function logout(){
+currentUser=null;
+app.style.display="none";
+loginScreen.style.display="flex";
+}
+
+function save(){
+localStorage.setItem("trans_"+currentUser,JSON.stringify(transactions));
+localStorage.setItem("depo_"+currentUser,JSON.stringify(deposits));
+}
+
+function addDeposit(){
+let raw = depositAmount.value.replace(/\./g,"");
+if(!raw) return;
+
+let date = new Date().toISOString().split("T")[0]; // ngày hôm nay
+let month = filterMonth.value || date.slice(0,7);
+
+deposits.push({
+amount: Number(raw),
+month: month,
+date: date
+});
+
+depositAmount.value="";
+save();
+render();
+}
+
+function addTransaction(){
+let typeValue = document.getElementById("type").value;
+let noteInput = document.getElementById("note");
+let amountInput = document.getElementById("amount");
+let dateInput = document.getElementById("date");
+
+let raw = amountInput.value.replace(/\./g,"");
+let date = dateInput.value || new Date().toISOString().split("T")[0];
+
+if(!raw) return;
+
+transactions.push({
+id: Date.now(),
+type: typeValue,
+note: noteInput.value,
+amount: Number(raw),
+date: date
+});
+
+noteInput.value="";
+amountInput.value="";
+
+save();
+render();
+}
+function deleteTransaction(id){
+transactions = transactions.filter(t => t.id !== id);
+save();
+render();
+}
+
+function render(){
+let list=transactionList;
+list.innerHTML="";
+let filter = document.getElementById("filterMonth").value;
+let filtered = transactions.filter(t => {
+if(!filter) return true;
+return t.date.slice(0,7) === filter;
+});
+let totalIncome=0,totalExpense=0;
+
+filtered.sort((a,b)=>b.date.localeCompare(a.date)).forEach(t=>{
+let div=document.createElement("div");
+div.className="transaction";
+div.innerHTML = `
+<span>
+${t.note || "(Không nội dung)"} 
+<small style="color:#888;font-size:11px;">
+(${formatDate(t.date)})
+</small>
+</span>
+<span>
+<span class="amount ${t.type==='income'?'plus':'minus'}">
+${t.type==='income'?'+':'-'}${formatMoney(t.amount)}
+</span>
+<button class="action-btn" onclick="deleteTransaction(${t.id})">x</button>
+</span>
+`;
+list.appendChild(div);
+if(t.type==="income")totalIncome+=t.amount;
+else totalExpense+=t.amount;
+});
+
+let depositMonth=deposits.filter(d=>!filter||d.month===filter)
+.reduce((s,d)=>s+d.amount,0);
+
+let depositListDiv = document.getElementById("depositList");
+depositListDiv.innerHTML="";
+
+deposits.forEach((d,index)=>{
+if(!filter || d.month===filter){
+let div=document.createElement("div");
+div.className="transaction";
+div.innerHTML=`
+<span>
+Nạp tiền 
+<small style="color:#888;font-size:11px;">
+(${formatDate(d.date)})
+</small>
+</span>
+<span>
+<span class="amount plus">+${formatMoney(d.amount)}</span>
+<button class="action-btn" onclick="deleteDeposit(${index})">x</button>
+</span>
+`;
+depositListDiv.appendChild(div);
+}
+});
+
+let balance=depositMonth+totalIncome-totalExpense;
+
+document.getElementById("depositInfo").innerText =
+"Tiền nạp tháng này: " + formatMoney(depositMonth);
+
+document.getElementById("totalIncome").innerText =
+"Tổng thu: " + formatMoney(totalIncome);
+
+document.getElementById("totalExpense").innerText =
+"Tổng chi: " + formatMoney(totalExpense);
+
+document.getElementById("balance").innerText =
+formatMoney(balance);
+
+drawChart(totalIncome,totalExpense);
+}
+
+function drawChart(income,expense){
+let ctx=chart.getContext("2d");
+ctx.clearRect(0,0,300,120);
+let max=Math.max(income,expense,1);
+ctx.fillStyle="#4CAF50";
+ctx.fillRect(60,100-(income/max)*80,40,(income/max)*80);
+ctx.fillStyle="#F44336";
+ctx.fillRect(160,100-(expense/max)*80,40,(expense/max)*80);
+}
+document.getElementById("filterMonth").addEventListener("change", function(){
+render();
+});
+</script>
+</body>
+</html>
