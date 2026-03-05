@@ -50,6 +50,34 @@ width:390px;height:500px;background:white;border-radius:30px;
 box-shadow:0 20px 60px rgba(0,0,0,0.15);
 padding:30px;display:flex;flex-direction:column;justify-content:center;
 }
+
+.money-input{
+position:relative;
+width:100%;
+margin-bottom:10px;
+display:block;
+}
+
+.money-input input{
+width:100%;
+padding:12px 50px 12px 12px;
+border-radius:12px;
+border:1px solid #e8d3a3;
+background:#fffdf8;
+outline:none;
+margin-bottom:0; /* QUAN TRỌNG */
+}
+
+.money-input .currency{
+position:absolute;
+right:15px;
+top:50%;
+transform:translateY(-50%);
+color:#a67c00;
+font-weight:600;
+pointer-events:none;
+}
+
 </style>
 </head>
 <body>
@@ -75,20 +103,36 @@ padding:30px;display:flex;flex-direction:column;justify-content:center;
 <input type="month" id="filterMonth">
 
 <div class="section-title">Nạp tiền</div>
-<input type="text" id="depositAmount" placeholder="Số tiền nạp">
 <button onclick="addDeposit()">Nạp tiền</button>
 
 <div id="depositList" style="margin-bottom:10px;"></div>
 
+<div class="money-input">
+  <input type="text" id="depositAmount" placeholder="Số tiền nạp">
+  <span class="currency">VND</span>
+</div>
+
+<button onclick="addDeposit()">Nạp tiền</button>
+
+<div id="depositList" style="margin-bottom:10px;"></div>
+
+
 <div class="section-title">Thêm giao dịch</div>
+
 <select id="type">
 <option value="income">Thu nhập</option>
 <option value="expense">Chi tiêu</option>
 </select>
 
 <input type="text" id="note" placeholder="Nội dung">
-<input type="text" id="amount" placeholder="Số tiền">
+
+<div class="money-input">
+  <input type="text" id="amount" placeholder="Số tiền">
+  <span class="currency">VND</span>
+</div>
+
 <input type="date" id="date">
+
 <button onclick="addTransaction()">Thêm giao dịch</button>
 
 <div class="stats">
@@ -123,8 +167,22 @@ return `${day}/${month}/${year}`;
 }
 
 function formatInputMoney(input){
-let value=input.value.replace(/\D/g,"");
-input.value=Number(value||0).toLocaleString('vi-VN');
+let cursorPos = input.selectionStart;
+let oldLength = input.value.length;
+
+let value = input.value.replace(/\D/g,"");
+
+if(!value){
+    input.value="";
+    return;
+}
+
+input.value = Number(value).toLocaleString('vi-VN');
+
+let newLength = input.value.length;
+cursorPos = cursorPos + (newLength - oldLength);
+
+input.setSelectionRange(cursorPos, cursorPos);
 }
 
 function deleteDeposit(index){
@@ -170,16 +228,30 @@ localStorage.setItem("depo_"+currentUser,JSON.stringify(deposits));
 }
 
 function addDeposit(){
-let raw = depositAmount.value.replace(/\./g,"");
+let raw = depositAmount.value.replace(/\D/g,"");
 if(!raw) return;
 
-let date = new Date().toISOString().split("T")[0]; // ngày hôm nay
-let month = filterMonth.value || date.slice(0,7);
+let selectedMonth = document.getElementById("filterMonth").value;
+let today = new Date();
+
+let date;
+
+// Nếu có chọn tháng
+if(selectedMonth){
+    // Lấy năm-tháng đã chọn + ngày hiện tại
+    let day = String(today.getDate()).padStart(2,"0");
+    date = selectedMonth + "-" + day;
+} else {
+    // Nếu chưa chọn tháng thì dùng hôm nay
+    date = today.toISOString().split("T")[0];
+}
+
+let month = date.slice(0,7);
 
 deposits.push({
-amount: Number(raw),
-month: month,
-date: date
+    amount: Number(raw),
+    month: month,
+    date: date
 });
 
 depositAmount.value="";
@@ -193,7 +265,7 @@ let noteInput = document.getElementById("note");
 let amountInput = document.getElementById("amount");
 let dateInput = document.getElementById("date");
 
-let raw = amountInput.value.replace(/\./g,"");
+let raw = amountInput.value.replace(/\D/g,"");
 let date = dateInput.value || new Date().toISOString().split("T")[0];
 
 if(!raw) return;
